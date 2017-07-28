@@ -6,25 +6,35 @@ import utest._
 
 class MyConfig(val config: Config) extends BaseConfig {
 
-  val optStr: Option[String]  = ~string
-  val strDef: String          = string | "foo"
+  val optStr: Option[String]    = ~string
+  val strDef: String            = string | "foo"
 
-  val reqInt: Int             = int
-  val optInt: Option[Int]     = ~int
-  val intDef: Int             = int | 2
+  val reqInt: Int               = int
+  val optInt: Option[Int]       = int.optional
+  val intDef: Int               = int | 2
+  val intList: List[Int]        = int.list
 
-  val reqBool: Boolean        = bool
-  val optBool: Option[Boolean]= ~bool
-  val boolDef: Boolean        = bool | false
+  val reqBool: Boolean          = bool
+  val optBool: Option[Boolean]  = ~bool
+  val boolDef: Boolean          = bool | false
 
-  val reqDouble: Double       = double
+  val boolList: List[Boolean]   = bool.list
+
+  val reqDouble: Double         = double
+  val optDouble: Option[Double] = double.optional
 
   object service extends ObjConfig {
-    val http:     Http       = obj
-    val services: List[Http] = objList
+    val http:     Http       = Http(obj)
+
+    val services: List[Http] = !obj map Http
+
+    // TODO val optServices: Option[List[Http]] = obj.list.optional map (_ map Http)
+
+    val optHttp:  Option[Http] = ~obj map Http
   }
 
-  implicit class Http(val config: Config) extends BaseConfig {
+
+  case class Http(config: Config) extends BaseConfig {
     val interface: String = string
     val port:      Int    = int
   }
@@ -38,8 +48,11 @@ object Test extends TestSuite {
           |optStr = "baz"
           |
           |reqInt = 32
+          |intList = [1,2,3]
           |
           |reqBool = true
+          |boolList = [ false, true ]
+          |
           |reqDouble = 0.75
           |
           |service {
@@ -62,12 +75,14 @@ object Test extends TestSuite {
       cfg.strDef     ==> "foo"
 
       cfg.reqInt     ==> 32
+      cfg.intList    ==> List(1,2,3)
       cfg.optInt     ==> None
       cfg.intDef     ==> 2
 
       cfg.reqBool    ==> true
       cfg.optBool    ==> None
       cfg.boolDef    ==> false
+      cfg.boolList   ==> List(false, true)
 
       cfg.reqDouble  ==> 0.75
 
@@ -75,6 +90,8 @@ object Test extends TestSuite {
       cfg.service.http.port ==> 8080
       cfg.service.services.length ==> 2
       cfg.service.services(1).interface ==> "0.0.0.2"
+
+      cfg.service.optHttp ==> None
     }
   }
 }
