@@ -4,15 +4,23 @@ import com.typesafe.config.{Config, ConfigFactory}
 import stscfg._
 import utest._
 
-class MyDConfig(val config: Config) extends BaseConfig {
+class MyConfig(val config: Config) extends BaseConfig {
+
+  val optStr: Option[String]  = ~string
+  val strDef: String          = string | "foo"
+
+  val reqInt: Int             = int
+  val optInt: Option[Int]     = ~int
+  val intDef: Int             = int | 2
+
+  val reqBool: Boolean        = bool
+  val optBool: Option[Boolean]= ~bool
+  val boolDef: Boolean        = bool | false
+
+  val reqDouble: Double       = double
 
   object service extends ObjConfig {
-    val url: String      = string
-    val poolSize: Int    = int
-    val debug: Boolean   = bool
-    val factor: Double   = double
-    val http: Http       = obj
-
+    val http:     Http       = obj
     val services: List[Http] = objList
   }
 
@@ -25,14 +33,16 @@ class MyDConfig(val config: Config) extends BaseConfig {
 object Test extends TestSuite {
   val tests: framework.Tree[framework.Test] = this {
     * - {
-      val cfg = new MyDConfig(ConfigFactory.parseString(
+      val cfg = new MyConfig(ConfigFactory.parseString(
         """
-          |service {
-          |  url = "http://example.net/rest"
-          |  poolSize = 32
-          |  debug = true
-          |  factor = 0.75
+          |optStr = "baz"
           |
+          |reqInt = 32
+          |
+          |reqBool = true
+          |reqDouble = 0.75
+          |
+          |service {
           |  http {
           |    interface = "0.0.0.0"
           |    port = 8080
@@ -48,10 +58,19 @@ object Test extends TestSuite {
           |}
         """.stripMargin))
 
-      cfg.service.url ==> "http://example.net/rest"
-      cfg.service.poolSize ==> 32
-      cfg.service.debug ==> true
-      cfg.service.factor ==> 0.75
+      cfg.optStr     ==> Some("baz")
+      cfg.strDef     ==> "foo"
+
+      cfg.reqInt     ==> 32
+      cfg.optInt     ==> None
+      cfg.intDef     ==> 2
+
+      cfg.reqBool    ==> true
+      cfg.optBool    ==> None
+      cfg.boolDef    ==> false
+
+      cfg.reqDouble  ==> 0.75
+
       cfg.service.http.interface ==> "0.0.0.0"
       cfg.service.http.port ==> 8080
       cfg.service.services.length ==> 2
