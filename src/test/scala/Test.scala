@@ -11,6 +11,19 @@ object Test extends TestSuite {
   val tests: framework.Tree[framework.Test] = this {
 
     * - {
+      class Cfg(c: Config) extends BaseConfig(c) {
+        val path : String  = string
+        val url  : String  = string | "http://example.net"
+
+        object service extends ObjConfig {
+          val port : Int = int | 8080
+        }
+
+        val foo    : FooCfg         = $[FooCfg]
+        val optFoo : Option[FooCfg] = optional($[FooCfg])
+        val foos   : List[FooCfg]   = $[FooCfg].list
+      }
+
       val config = ConfigFactory.parseString(
         """
           |path = "/tmp"
@@ -24,21 +37,10 @@ object Test extends TestSuite {
           |foos = [ { str = "baz0" }, { str = "baz1" } ]
         """.stripMargin)
 
-      object cfg extends BaseConfig(config) {
-
-        val path : String  = string
-        val url  : String  = string | "http://example.net"
-
-        object service extends ObjConfig {
-          val port : Int = int | 8080
-        }
-
-        val foo    : FooCfg         = $[FooCfg]
-        val optFoo : Option[FooCfg] = optional($[FooCfg])
-        val foos   : List[FooCfg]   = $[FooCfg].list
-      }
+      val cfg = new Cfg(config)
 
       assert( cfg.path == "/tmp" )
+      assert( cfg.url == "http://example.net" )
       assert( cfg.service.port == 9090 )
       assert( cfg.foo.str == "baz" )
       assert( cfg.foo.optInt.contains(3) )

@@ -13,16 +13,21 @@ stscfg has two main classes, `BaseConfig` and `ObjConfig`.
 Extend `BaseConfig` to define a base configuration object,
 and extend `ObjConfig` to directly define an embedded 
 configuration object. 
+Methods in these classes, along with supporting elements, 
+can be used to specify your configuration schema.
 
 ## Example
 
 ```scala
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import stscfg._
 
-object cfg extends BaseConfig(ConfigFactory.load().resolve()) {
+class Cfg(c: Config) extends BaseConfig(c) {
 
+  // a required string
   val path : String  = string
+  
+  // a string with a default value
   val url  : String  = string | "http://example.net"
 
   // directly defined embedded object
@@ -30,19 +35,19 @@ object cfg extends BaseConfig(ConfigFactory.load().resolve()) {
     val port : Int = int | 8080
   }
 
-  val foo    : FooCfg         = $[FooCfg]
-  val optFoo : Option[FooCfg] = optional($[FooCfg])
-  val foos   : List[FooCfg]   = $[FooCfg].list
-
+  // structure that can be used multiple times
   class FooCfg(c: Config) extends BaseConfig(c) {
     val str    : String      = string
     val optInt : Option[Int] = optional(int)
   }
+
+  val foo    : FooCfg         = $[FooCfg]
+  val optFoo : Option[FooCfg] = optional($[FooCfg])
+  val foos   : List[FooCfg]   = $[FooCfg].list
 }
 ```
 
-With the `cfg` object defined above we can parse the following
-configuration:
+we can parse the following configuration:
 
 ```
 path = "/tmp"
@@ -57,7 +62,10 @@ foos = [ { str = "baz0" }, { str = "baz1" } ]
 ```
 
 ```scala
+val cfg = new Cfg(ConfigFactory.parseString(...))
+
 assert( cfg.path == "/tmp" )
+assert( cfg.url == "http://example.net" )
 assert( cfg.service.port == 9090 )
 assert( cfg.foo.str == "baz" )
 assert( cfg.foo.optInt == Some(3) )
