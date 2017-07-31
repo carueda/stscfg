@@ -16,12 +16,64 @@ configuration object.
 Methods in these classes, along with supporting elements, 
 can be used to specify your configuration schema.
 
-## Example
+## Examples
+
+The example from [static-config](https://github.com/Krever/static-config) looks like this:
 
 ```scala
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
+import java.time.Duration
 import stscfg._
 
+class Cfg(c: Config) extends BaseConfig(c) {
+
+  object `static-config` extends ObjConfig {
+    val intEntry    : Int    = int
+    val stringEntry : String = string
+
+    object group extends ObjConfig {
+      val listEntry     : List[String] = string.list
+      val durationEntry : Duration     = duration
+    }
+  }
+
+  val `other-config` : Int = int
+}
+
+val config = ConfigFactory.parseString(
+  """
+    |static-config {
+    |  intEntry = 1
+    |  stringEntry = "String"
+    |  group {
+    |    listEntry = ["val1", "val2"]
+    |    durationEntry = 6h
+    |  }
+    |}
+    |other-config = 2
+  """.stripMargin)
+
+val cfg = new Cfg(config)
+
+cfg.`static-config`.intEntry ==> 1
+cfg.`static-config`.stringEntry ==> "String"
+cfg.`static-config`.group.listEntry ==> List("val1", "val2")
+cfg.`static-config`.group.durationEntry.toHours ==>  6
+cfg.`other-config` ==> 2
+```
+
+With an object structure definition to be used multiple times,
+first define the corresponding BaseConfig and then refer to it
+in the main definitions:
+
+```scala
+// the common object structure:
+class FooCfg(c: Config) extends BaseConfig(c) {
+  val str    : String      = string
+  val optInt : Option[Int] = optional[Int]
+}
+
+// the main configuration schema:
 class Cfg(c: Config) extends BaseConfig(c) {
 
   // a required string
@@ -35,19 +87,14 @@ class Cfg(c: Config) extends BaseConfig(c) {
     val port : Int = int | 8080
   }
 
-  // structure that can be used multiple times
-  class FooCfg(c: Config) extends BaseConfig(c) {
-    val str    : String      = string
-    val optInt : Option[Int] = optional[Int]
-  }
-
   val foo    : FooCfg         = $[FooCfg]
   val optFoo : Option[FooCfg] = optional[FooCfg]
   val foos   : List[FooCfg]   = $[FooCfg].list
 }
+
 ```
 
-we can parse the following configuration:
+With the above in place, we can then parse the following configuration:
 
 ```
 path = "/tmp"
@@ -56,9 +103,17 @@ service = {
   port = 9090
 }
 
-foo = { str = "baz", optInt = 3 }
+foo = { 
+  str = "baz", 
+  optInt = 3 
+}
+
 optFoo = { str = "bar" }
-foos = [ { str = "baz0" }, { str = "baz1" } ]
+
+foos = [ 
+  { str = "baz0" }, 
+  { str = "baz1" } 
+]
 ```
 
 ```scala

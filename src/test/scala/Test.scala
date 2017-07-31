@@ -1,3 +1,5 @@
+import java.time.Duration
+
 import com.typesafe.config.{Config, ConfigFactory}
 import stscfg._
 import utest._
@@ -9,6 +11,43 @@ class FooCfg(c: Config) extends BaseConfig(c) {
 
 object Test extends TestSuite {
   val tests: framework.Tree[framework.Test] = this {
+
+    * - {
+      class Cfg(c: Config) extends BaseConfig(c) {
+        object `static-config` extends ObjConfig {
+          val intEntry    : Int    = int
+          val stringEntry : String = string
+
+          object group extends ObjConfig {
+            val listEntry     : List[String] = string.list
+            val durationEntry : Duration     = duration
+          }
+        }
+
+        val `other-config` : Int = int
+      }
+
+      val config = ConfigFactory.parseString(
+        """
+          |static-config {
+          |  intEntry = 1
+          |  stringEntry = "String"
+          |  group {
+          |    listEntry = ["val1", "val2"]
+          |    durationEntry = 6h
+          |  }
+          |}
+          |other-config = 2
+        """.stripMargin)
+
+      val cfg = new Cfg(config)
+
+      cfg.`static-config`.intEntry ==> 1
+      cfg.`static-config`.stringEntry ==> "String"
+      cfg.`static-config`.group.listEntry ==> List("val1", "val2")
+      cfg.`static-config`.group.durationEntry.toHours ==>  6
+      cfg.`other-config` ==> 2
+    }
 
     * - {
       class Cfg(c: Config) extends BaseConfig(c) {

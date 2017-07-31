@@ -1,5 +1,7 @@
 package stscfg
 
+import java.time.Duration
+
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.collection.JavaConverters._
@@ -40,6 +42,8 @@ abstract class BaseConfig(config: Config) {
   def double(implicit valName: sourcecode.Name): Extractor[Double] = $[Double]
 
   def bool(implicit valName: sourcecode.Name): Extractor[Boolean] = $[Boolean]
+
+  def duration(implicit valName: sourcecode.Name): Extractor[Duration] = $[Duration]
 
   def optional[T : TypeTag](x: Extractor[T])
              (implicit valName: sourcecode.Name): Extractor[Option[T]] =
@@ -106,8 +110,11 @@ abstract class BaseConfig(config: Config) {
         case t if t <:< typeOf[List[_]] ⇒
           handleList(typ.typeArgs.head, requireList(configValueOpt))
 
+        case t if t <:< typeOf[Duration] ⇒
+          handleDuration(requireValue(configValueOpt))
+
         case _ ⇒
-          handleBasic(typ, requireValue(configValueOpt))
+          handleBasic(requireValue(configValueOpt))
       }
 
       def handleOption(argType: Type, configValueOpt: Option[Any]): T =
@@ -116,7 +123,15 @@ abstract class BaseConfig(config: Config) {
       def handleList(argType: Type, values: List[_]): T =
         values.map(v ⇒ handleType(argType, Some(v))).asInstanceOf[T]
 
-      def handleBasic(basicType: Type, value: Any): T =
+      def handleDuration(value: Any): T = {
+        val v: String = value match {
+          case v:String  ⇒ "\"" + v + "\""
+          case _         ⇒ value.toString
+        }
+        ConfigFactory.parseString(s"d = $v").getDuration("d").asInstanceOf[T]
+      }
+
+      def handleBasic(value: Any): T =
         value.asInstanceOf[T]
 
       handleType(typeOf[T], if (config.hasPath(name))
