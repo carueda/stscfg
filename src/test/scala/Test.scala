@@ -4,7 +4,7 @@ import utest._
 
 class FooCfg(c: Config) extends BaseConfig(c) {
   val str    : String      = string
-  val optInt : Option[Int] = optional(int)
+  val optInt : Option[Int] = optional[Int]
 }
 
 object Test extends TestSuite {
@@ -20,7 +20,7 @@ object Test extends TestSuite {
         }
 
         val foo    : FooCfg         = $[FooCfg]
-        val optFoo : Option[FooCfg] = optional($[FooCfg])
+        val optFoo : Option[FooCfg] = optional[FooCfg]
         val foos   : List[FooCfg]   = $[FooCfg].list
       }
 
@@ -67,7 +67,7 @@ object Test extends TestSuite {
 
       object cfg extends BaseConfig(config) {
         val reqStr : String          = string
-        val optStr : Option[String]  = optional(string)
+        val optStr : Option[String]  = optional[String]
 
         object service extends ObjConfig {
           val someStr  : String       = string | "hey"
@@ -76,7 +76,7 @@ object Test extends TestSuite {
         }
 
         val reqFoo  : FooCfg                     = $[FooCfg]
-        val optFoo  : Option[FooCfg]             = optional($[FooCfg])
+        val optFoo  : Option[FooCfg]             = optional[FooCfg]
         val lstFoo  : List[FooCfg]               = $[FooCfg].list
         val opLFoo  : Option[List[FooCfg]]       = $[Option[List[FooCfg]]]
         val opLLFoo : Option[List[List[FooCfg]]] = optional($[FooCfg].list.list)

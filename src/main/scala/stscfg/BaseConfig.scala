@@ -45,6 +45,10 @@ abstract class BaseConfig(config: Config) {
              (implicit valName: sourcecode.Name): Extractor[Option[T]] =
     new Extractor[Option[T]](valName.value)
 
+  def optional[T : ClassTag : TypeTag](implicit valName: sourcecode.Name): Extractor[Option[T]] = {
+    new Extractor[Option[T]](valName.value)
+  }
+
   /**
     * Actual extraction of the configuration value.
     */

@@ -25,10 +25,10 @@ import stscfg._
 class Cfg(c: Config) extends BaseConfig(c) {
 
   // a required string
-  val path : String  = string
+  val path : String = string
   
   // a string with a default value
-  val url  : String  = string | "http://example.net"
+  val url : String = string | "http://example.net"
 
   // directly defined embedded object
   object service extends ObjConfig {
@@ -38,11 +38,11 @@ class Cfg(c: Config) extends BaseConfig(c) {
   // structure that can be used multiple times
   class FooCfg(c: Config) extends BaseConfig(c) {
     val str    : String      = string
-    val optInt : Option[Int] = optional(int)
+    val optInt : Option[Int] = optional[Int]
   }
 
   val foo    : FooCfg         = $[FooCfg]
-  val optFoo : Option[FooCfg] = optional($[FooCfg])
+  val optFoo : Option[FooCfg] = optional[FooCfg]
   val foos   : List[FooCfg]   = $[FooCfg].list
 }
 ```
