@@ -1,159 +1,131 @@
 package stscfg
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
-trait BaseConfig {
-  def config: Config
+/**
+  * Extend this to define a base configuration object.
+  * Example:
+  * {{{
+  * object cfg extends BaseConfig(config) {
+  *   val interface : String = string | "0.0.0.0"
+  *   val port      : Int    = int | 8080
+  *   ...
+  * }
+  * }}}
+  *
+  * @param config Typesafe configuration object
+  */
+abstract class BaseConfig(config: Config) {
 
-  def string(implicit valName: sourcecode.Name): Extractor[String] =
-    new Extractor(valName.value)
-
-  def int(implicit valName: sourcecode.Name): Extractor[Int] =
-    new Extractor(valName.value)
-
-  def double(implicit valName: sourcecode.Name): Extractor[Double] =
-    new Extractor(valName.value)
-
-  def bool(implicit valName: sourcecode.Name): Extractor[Boolean] =
-    new Extractor(valName.value)
+  abstract class ObjConfig(implicit name: sourcecode.Name) extends BaseConfig(config.getConfig(name.value))
 
   import scala.language.implicitConversions
 
   implicit def extractor2t[T](xtor: Extractor[T]): T = xtor.extract
 
-//  def obj[T](implicit valName: sourcecode.Name, ctor: Config ⇒ T): T =
-//    ctor(config.getConfig(valName.value))
+  def $[T : ClassTag : TypeTag](implicit valName: sourcecode.Name): Extractor[T] = {
+    new Extractor[T](valName.value)
+  }
 
-  def obj(implicit valName: sourcecode.Name): Extractor[Config] =
-    new Extractor(valName.value)
+  def string(implicit valName: sourcecode.Name): Extractor[String] = $[String]
 
-//  def objList[T](implicit valName: sourcecode.Name, ctor: Config ⇒ T): List[T] =
-//    config.getObjectList(valName.value).asScala.toList.map(_.toConfig).map(ctor)
+  def int(implicit valName: sourcecode.Name): Extractor[Int] = $[Int]
 
-  class ObjConfig(implicit objName: sourcecode.Name) extends DConfigNode(config)(objName)
+  def long(implicit valName: sourcecode.Name): Extractor[Long] = $[Long]
 
-  // TODO support complex things like these:
-  //     int.list.list.optional
-  //     obj.list.optional
-  // with *composition* of Extractors: BasicExtractor, OptExtractor,
-  // ListExtractor, and the like.
-  // Currently, the following is simplistic and with a bunch of boilerplate..
+  def double(implicit valName: sourcecode.Name): Extractor[Double] = $[Double]
 
-  class Extractor[T : TypeTag](name: String, default: Option[T] = None) {
+  def bool(implicit valName: sourcecode.Name): Extractor[Boolean] = $[Boolean]
 
-    def |(d: T): Extractor[T] = new Extractor[T](name, default = Some(d))
+  def optional[T : TypeTag](x: Extractor[T])
+             (implicit valName: sourcecode.Name): Extractor[Option[T]] =
+    new Extractor[Option[T]](valName.value)
 
-    def optional: Extractor[Option[T]] = new Extractor[Option[T]](name)
+  /**
+    * Actual extraction of the configuration value.
+    */
+  class Extractor[T : ClassTag : TypeTag](name: String, defaultOpt: Option[T] = None) {
+
+    /**
+      * Allows to indicate a default value.
+      * Example:
+      * {{{
+      *   val string = string | "foo"
+      *   val port   = int | 8080
+      * }}}
+      * @param d  The default value
+      */
+    def |(d: T): Extractor[T] = defaultOpt match {
+      case None    ⇒ new Extractor[T](name, defaultOpt = Some(d))
+
+      case Some(v) ⇒ throw new RuntimeException(
+        s"| operator already used for $name (with value $v)")
+    }
 
     def list: Extractor[List[T]] = new Extractor[List[T]](name)
 
-    def unary_~ : Extractor[Option[T]] = optional
-    def unary_! : Extractor[List[T]]   = list
+    def optional: Extractor[Option[T]] = new Extractor[Option[T]](name)
 
-    def extract: T = typeOf[T] match {
-      case t if t =:= typeOf[String] ⇒
-        (default match {
-          case None ⇒
-            config.getString(name)
-          case Some(value) ⇒
-            if (config.hasPath(name))
-              config.getString(name)
-            else
-              value
-        }).asInstanceOf[T]
+    def extract: T = {
+      def requireValue(configValueOpt: Option[Any]): Any =
+        (configValueOpt orElse defaultOpt).getOrElse(
+          throw new RuntimeException("missing value for " + name)
+        )
 
-      case t if t =:= typeOf[Option[String]] ⇒
-        (if (config.hasPath(name))
-          Some(config.getString(name))
-        else None).asInstanceOf[T]
+      def requireList(configValueOpt: Option[Any]): List[_] = {
+        requireValue(configValueOpt) match {
+          case l: java.util.ArrayList[_] ⇒ l.asScala.toList
+          case _ ⇒ throw new RuntimeException("expecting list for " + name)
+        }
+      }
 
-      case t if t =:= typeOf[Int] ⇒
-        (default match {
-          case None ⇒
-            config.getInt(name)
-          case Some(value) ⇒
-            if (config.hasPath(name))
-              config.getInt(name)
-            else
-              value
-        }).asInstanceOf[T]
+      def requireHashMap(configValueOpt: Option[Any]): HMap = {
+        requireValue(configValueOpt) match {
+          case m: HMap ⇒ m
+          case _ ⇒ throw new RuntimeException("expecting object for " + name)
+        }
+      }
 
-      case t if t =:= typeOf[Option[Int]] ⇒
-        (if (config.hasPath(name))
-          Some(config.getInt(name))
-        else None).asInstanceOf[T]
+      def handleType(typ: Type, configValueOpt: Option[Any]): T = typ match {
+        case t if t <:< typeOf[BaseConfig] ⇒
+          val m = runtimeMirror(getClass.getClassLoader)
+          val cls = m.runtimeClass(typ.typeSymbol.asClass)
+          createObject(cls, requireHashMap(configValueOpt)).asInstanceOf[T]
 
-      case t if t =:= typeOf[List[Int]] ⇒
-        config.getIntList(name).asScala.toList.asInstanceOf[T]
+        case t if t <:< typeOf[Option[_]] ⇒
+          handleOption(typ.typeArgs.head, configValueOpt)
 
-      // Double
-      case t if t =:= typeOf[Double] ⇒
-        (default match {
-          case None ⇒
-            config.getDouble(name)
-          case Some(value) ⇒
-            if (config.hasPath(name))
-              config.getDouble(name)
-            else
-              value
-        }).asInstanceOf[T]
+        case t if t <:< typeOf[List[_]] ⇒
+          handleList(typ.typeArgs.head, requireList(configValueOpt))
 
-      case t if t =:= typeOf[Option[Double]] ⇒
-        (if (config.hasPath(name))
-          Some(config.getDouble(name))
-        else None).asInstanceOf[T]
+        case _ ⇒
+          handleBasic(typ, requireValue(configValueOpt))
+      }
 
-      case t if t =:= typeOf[List[Double]] ⇒
-        config.getDoubleList(name).asScala.toList.asInstanceOf[T]
+      def handleOption(argType: Type, configValueOpt: Option[Any]): T =
+        configValueOpt.map(v ⇒ handleType(argType, Some(v))).asInstanceOf[T]
 
-      // Boolean
-      case t if t =:= typeOf[Boolean] ⇒
-        (default match {
-          case None ⇒
-            config.getBoolean(name)
-          case Some(value) ⇒
-            if (config.hasPath(name))
-              config.getBoolean(name)
-            else
-              value
-        }).asInstanceOf[T]
+      def handleList(argType: Type, values: List[_]): T =
+        values.map(v ⇒ handleType(argType, Some(v))).asInstanceOf[T]
 
-      case t if t =:= typeOf[Option[Boolean]] ⇒
-        (if (config.hasPath(name))
-          Some(config.getBoolean(name))
-        else None).asInstanceOf[T]
+      def handleBasic(basicType: Type, value: Any): T =
+        value.asInstanceOf[T]
 
-      case t if t =:= typeOf[List[Boolean]] ⇒
-        config.getBooleanList(name).asScala.toList.asInstanceOf[T]
-
-      // Config
-      case t if t =:= typeOf[Config] ⇒
-        (default match {
-          case None ⇒
-            config.getConfig(name)
-          case Some(value) ⇒
-            if (config.hasPath(name))
-              config.getConfig(name)
-            else
-              value
-        }).asInstanceOf[T]
-
-      case t if t =:= typeOf[Option[Config]] ⇒
-        (if (config.hasPath(name))
-          Some(config.getConfig(name))
-        else None).asInstanceOf[T]
-
-      case t if t =:= typeOf[List[Config]] ⇒
-        config.getObjectList(name).asScala.toList.map(_.toConfig).asInstanceOf[T]
-
+      handleType(typeOf[T], if (config.hasPath(name))
+        Some(config.getAnyRef(name))
+      else None)
     }
   }
-}
 
-abstract class DConfigNode(parent: Config)
-                          (implicit objName: sourcecode.Name) extends BaseConfig {
-  def config: Config = parent.getConfig(objName.value)
+  private def createObject(cls: Class[_], value: HMap): Any = {
+    val d = ConfigFactory.parseMap(value.asInstanceOf[java.util.HashMap[String, _]])
+    val ctor = cls.getConstructor(classOf[Config])
+    ctor.newInstance(d)
+  }
+
+  private type HMap = java.util.HashMap[_, _]
 }
