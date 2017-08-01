@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/carueda/stscfg.svg?branch=master)](https://travis-ci.org/carueda/stscfg)
+
 # stscfg
 
 This preliminary project captures some ideas to extend the basic mechanism from 
