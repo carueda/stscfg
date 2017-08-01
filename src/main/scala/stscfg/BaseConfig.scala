@@ -9,6 +9,11 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
+  * Represents a size-in-bytes value
+  */
+final case class Size(bytes: Long)
+
+/**
   * Extend this to define a base configuration object.
   * Example:
   * {{{
@@ -44,6 +49,8 @@ abstract class BaseConfig(config: Config) {
   def bool(implicit valName: sourcecode.Name): Extractor[Boolean] = $[Boolean]
 
   def duration(implicit valName: sourcecode.Name): Extractor[Duration] = $[Duration]
+
+  def size(implicit valName: sourcecode.Name): Extractor[Size] = $[Size]
 
   def optional[T : TypeTag](x: Extractor[T])
              (implicit valName: sourcecode.Name): Extractor[Option[T]] =
@@ -110,8 +117,14 @@ abstract class BaseConfig(config: Config) {
         case t if t <:< typeOf[List[_]] ⇒
           handleList(typ.typeArgs.head, requireList(configValueOpt))
 
-        case t if t <:< typeOf[Duration] ⇒
+        case t if t =:= typeOf[Duration] ⇒
           handleDuration(requireValue(configValueOpt))
+
+        case t if t =:= typeOf[Size] ⇒
+          handleSize(requireValue(configValueOpt))
+
+        case t if t =:= typeOf[Long] ⇒
+          handleLong(requireValue(configValueOpt))
 
         case _ ⇒
           handleBasic(requireValue(configValueOpt))
@@ -123,13 +136,20 @@ abstract class BaseConfig(config: Config) {
       def handleList(argType: Type, values: List[_]): T =
         values.map(v ⇒ handleType(argType, Some(v))).asInstanceOf[T]
 
-      def handleDuration(value: Any): T = {
-        val v: String = value match {
-          case v:String  ⇒ "\"" + v + "\""
-          case _         ⇒ value.toString
+      def handleDuration(value: Any): T =
+        ConfigFactory.parseString(s"d = $value").getDuration("d").asInstanceOf[T]
+
+      def handleSize(value: Any): T = {
+        val v = value match {
+          case Size(b) ⇒ b
+          case _       ⇒ value
         }
-        ConfigFactory.parseString(s"d = $v").getDuration("d").asInstanceOf[T]
+        val bytes = ConfigFactory.parseString(s"p = $v").getBytes("p")
+        Size(bytes).asInstanceOf[T]
       }
+
+      def handleLong(value: Any): T =
+        value.asInstanceOf[java.lang.Number].longValue().asInstanceOf[T]
 
       def handleBasic(value: Any): T =
         value.asInstanceOf[T]

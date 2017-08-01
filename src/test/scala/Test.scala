@@ -12,7 +12,7 @@ class FooCfg(c: Config) extends BaseConfig(c) {
 object Test extends TestSuite {
   val tests: framework.Tree[framework.Test] = this {
 
-    * - {
+    "static-config" - {
       class Cfg(c: Config) extends BaseConfig(c) {
         object `static-config` extends ObjConfig {
           val intEntry    : Int    = int
@@ -21,6 +21,7 @@ object Test extends TestSuite {
           object group extends ObjConfig {
             val listEntry     : List[String] = string.list
             val durationEntry : Duration     = duration
+            val optDuration   : Option[Duration] = optional(duration)
           }
         }
 
@@ -35,6 +36,7 @@ object Test extends TestSuite {
           |  group {
           |    listEntry = ["val1", "val2"]
           |    durationEntry = 6h
+          |    optDuration = 3600s
           |  }
           |}
           |other-config = 2
@@ -46,10 +48,11 @@ object Test extends TestSuite {
       cfg.`static-config`.stringEntry ==> "String"
       cfg.`static-config`.group.listEntry ==> List("val1", "val2")
       cfg.`static-config`.group.durationEntry.toHours ==>  6
+      cfg.`static-config`.group.optDuration.map(_.toMinutes) ==> Some(60)
       cfg.`other-config` ==> 2
     }
 
-    * - {
+    "service-and-foo" - {
       class Cfg(c: Config) extends BaseConfig(c) {
         val path : String  = string
         val url  : String  = string | "http://example.net"
@@ -85,7 +88,7 @@ object Test extends TestSuite {
       assert( cfg.foo.optInt.contains(3) )
     }
 
-    * - {
+    "service-and-foo2" - {
       val config = ConfigFactory.parseString(
         """
           |reqStr = "reqStr"
@@ -140,6 +143,34 @@ object Test extends TestSuite {
       cfg.service.someStr  ==> "xyz"
       cfg.service.someBool ==> false
       cfg.service.dblList  ==> List(3.14, 1.21)
+    }
+
+    "size-in-bytes" - {
+      class Cfg(c: Config) extends BaseConfig(c) {
+        val sizeReq : Size             = size
+        val sizeOpt : Option[Size]     = optional(size)
+        val sizeDfl : Size             = size | Size(1024)
+        val sizes   : List[Size]       = size.list
+        val sizes2  : List[List[Size]] = size.list.list
+      }
+
+      val config = ConfigFactory.parseString(
+        """
+          |regularLong = 2121
+          |
+          |sizeReq = 2048K
+          |sizeOpt = "1024000"
+          |sizes = [ 1000, "64G", "16kB" ]
+          |sizes2  = [[ 1000, "64G" ], [ "16kB" ] ]
+        """.stripMargin)
+
+      val cfg = new Cfg(config)
+
+      cfg.sizeReq.bytes ==> 2048*1024
+      assert(cfg.sizeOpt.contains(Size(1024000)))
+      cfg.sizeDfl.bytes ==> 1024
+      cfg.sizes.map(_.bytes) ==> List(1000, 64*1024*1024*1024L, 16*1000)
+      cfg.sizes2.map(_ map (_.bytes)) ==> List(List(1000, 64*1024*1024*1024L), List(16*1000))
     }
   }
 }
