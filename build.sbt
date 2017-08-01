@@ -24,9 +24,9 @@ publishTo := {
     Some("releases"  at nexus + "service/local/staging/deploy/maven2")
 }
 pomIncludeRepository := { _ => false }
-homepage := Some(url("https://github.com/carueda/tscfg"))
+homepage := Some(url("https://github.com/carueda/stscfg"))
 licenses := Seq("Apache 2.0" -> url("http://www.opensource.org/licenses/Apache-2.0"))
-scmInfo := Some(ScmInfo(url("http://github.com/carueda/tscfg"), "scm:git@github.com:carueda/tscfg.git"))
+scmInfo := Some(ScmInfo(url("http://github.com/carueda/stscfg"), "scm:git@github.com:carueda/stscfg.git"))
 pomExtra :=
   <developers>
     <developer>
