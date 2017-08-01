@@ -14,6 +14,10 @@ libraryDependencies ++= Seq(
 )
 testFrameworks += new TestFramework("utest.runner.Framework")
 
+coverageMinimum := 80
+coverageFailOnMinimum := false
+coverageHighlighting := { scalaBinaryVersion.value == "2.11" }
+
 publishMavenStyle := true
 publishArtifact in Test := false
 publishTo := {

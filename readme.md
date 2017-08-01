@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/carueda/stscfg.svg?branch=master)](https://travis-ci.org/carueda/stscfg)
+[![Coverage Status](https://coveralls.io/repos/github/carueda/stscfg/badge.svg?branch=master)](https://coveralls.io/github/carueda/stscfg?branch=master)
 
 # stscfg
 
