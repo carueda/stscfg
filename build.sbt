@@ -16,7 +16,7 @@ testFrameworks += new TestFramework("utest.runner.Framework")
 
 coverageMinimum := 80
 coverageFailOnMinimum := false
-coverageHighlighting := { scalaBinaryVersion.value == "2.11" }
+coverageHighlighting := { scalaBinaryVersion.value == "2.12" }
 
 publishMavenStyle := true
 publishArtifact in Test := false
